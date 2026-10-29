@@ -3,6 +3,7 @@ plan: morning-digest
 status: done
 owner: rook
 opened: 2026-10-29
+closed: 2026-10-29
 ---
 
 # Morning digest
