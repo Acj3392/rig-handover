@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DigestRow, Night, ReadNight, RunStatus } from './types.js';
 
-type Line = { at: string; job: string; status: RunStatus; owner: string | null; error: string | null };
+export type Line = { at: string; job: string; status: RunStatus; owner: string | null; error: string | null };
 
 const STATUSES: readonly string[] = ['ok', 'retry', 'fail'];
 
@@ -28,22 +28,30 @@ function parseLine(text: string): Line | null {
   };
 }
 
-export const readNight: ReadNight = (runsDir, night) => {
+// Reads and parses every line of a night. null when the file doesn't exist.
+export function readLines(runsDir: string, night: string): { lines: Line[]; badLines: number } | null {
   let text: string;
   try {
     text = readFileSync(join(runsDir, `${night}.jsonl`), 'utf8');
   } catch {
     return null;
   }
-  const byJob = new Map<string, DigestRow>();
+  const lines: Line[] = [];
   let badLines = 0;
   for (const raw of text.split('\n')) {
     if (raw.trim() === '') continue;
     const line = parseLine(raw);
-    if (!line) {
-      badLines++;
-      continue;
-    }
+    if (line) lines.push(line);
+    else badLines++;
+  }
+  return { lines, badLines };
+}
+
+export const readNight: ReadNight = (runsDir, night) => {
+  const read = readLines(runsDir, night);
+  if (!read) return null;
+  const byJob = new Map<string, DigestRow>();
+  for (const line of read.lines) {
     const row = byJob.get(line.job);
     if (!row) {
       byJob.set(line.job, {
@@ -66,5 +74,5 @@ export const readNight: ReadNight = (runsDir, night) => {
     row.lastAt = line.at;
   }
   const rows = [...byJob.values()].sort((a, b) => a.job.localeCompare(b.job));
-  return { night, rows, badLines } satisfies Night;
+  return { night, rows, badLines: read.badLines } satisfies Night;
 };
